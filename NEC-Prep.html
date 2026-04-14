@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEC Master Exam Sim 2026</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #e74c3c; --bg: #f4f7f6; --flagged: #f1c40f; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: #333; max-width: 850px; margin: 0 auto; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--primary); margin-bottom: 15px; padding-bottom: 10px; }
+        .timer { font-size: 1.6rem; font-weight: bold; color: var(--accent); font-family: monospace; }
+        .nav-status { margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 5px; }
+        .q-dot { width: 22px; height: 22px; border-radius: 4px; border: 1px solid #ccc; background: white; font-size: 0.7rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .q-dot.active { border: 2px solid var(--primary); background: #d1d8e0; }
+        .q-dot.flagged { background: var(--flagged); border-color: #d4ac0d; }
+        .card { background: white; padding: 35px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 20px; position: relative; min-height: 400px; }
+        .flag-btn { position: absolute; top: 15px; right: 15px; background: #fff; border: 1px solid #ccc; padding: 8px 12px; cursor: pointer; border-radius: 4px; }
+        .flag-btn.is-flagged { background: var(--flagged); }
+        .q-text { font-size: 1.4rem; font-weight: 600; margin-bottom: 25px; line-height: 1.5; padding-right: 100px; }
+        .option { display: block; background: #f8f9fa; padding: 18px; margin: 12px 0; border-radius: 8px; cursor: pointer; border: 2px solid #ddd; font-size: 1.1rem; }
+        .option.selected { background: #d1d8e0; border-color: var(--primary); font-weight: bold; }
+        .controls { display: flex; gap: 10px; }
+        .btn { flex: 1; padding: 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1rem; color: white; }
+        .btn-next { background: var(--primary); }
+        .btn-back { background: #7f8c8d; }
+        .btn-end { background: #95a5a6; max-width: 120px; }
+        #review-screen { display: none; }
+        .review-item { border-bottom: 1px solid #eee; padding: 20px 0; }
+    </style>
+</head>
+<body>
+
+<div id="test-container">
+    <div class="header">
+        <div>
+            <h2 style="margin:0;">NEC Advanced Practice</h2>
+            <small id="q-progress">Loading Exam...</small>
+        </div>
+        <div class="timer" id="timer">02:00:00</div>
+    </div>
+    <div class="nav-status" id="nav-dots"></div>
+    <div class="card">
+        <button class="flag-btn" id="flag-btn" onclick="toggleFlag()">Flag Question</button>
+        <div class="q-text" id="question">Preparing questions...</div>
+        <div id="options-container"></div>
+        <div class="controls">
+            <button class="btn btn-back" id="back-btn" onclick="handleBack()">← Back</button>
+            <button class="btn btn-next" id="next-btn" onclick="handleNext()">Next →</button>
+            <button class="btn btn-end" onclick="confirmEnd()">End</button>
+        </div>
+    </div>
+</div>
+
+<div id="review-screen">
+    <div style="text-align: center; background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+        <h1 id="final-score" style="margin:0;">0%</h1>
+        <p id="raw-score">0 / 37</p>
+    </div>
+    <div class="card" id="review-list"></div>
+    <div style="text-align:center;"><button class="btn btn-back" style="width:200px; margin-bottom:40px;" onclick="location.reload()">Restart New Random Test</button></div>
+</div>
+
+<script>
+const questionBank = [
+    { q: "Per 2026 NEC, branch-circuit and feeder load calculations have been relocated to which Article?", a: "Article 120", o: ["Article 210", "Article 215", "Article 120", "Article 220"], r: "NEC 2026 Art. 120" },
+    { q: "What is the demand factor for 5 household electric clothes dryers?", a: "85%", o: ["100%", "85%", "70%", "60%"], r: "Table 120.54" },
+    { q: "A 240V, 5HP single-phase motor has a Full Load Current (FLC) of:", a: "28 Amps", o: ["24 Amps", "28 Amps", "32 Amps", "40 Amps"], r: "Table 430.248" },
+    { q: "What is the minimum size Copper Equipment Grounding Conductor for a 60A circuit?", a: "10 AWG", o: ["12 AWG", "10 AWG", "8 AWG", "6 AWG"], r: "Table 250.122" },
+    { q: "Maximum number of #12 THHN conductors allowed in a 1/2 inch EMT conduit?", a: "9", o: ["6", "9", "12", "15"], r: "Annex C, Table C.1" },
+    { q: "In Class I, Div 1 locations, sealing fittings must be installed within ___ of the enclosure.", a: "18 inches", o: ["12 inches", "18 inches", "24 inches", "36 inches"], r: "NEC 501.15(A)" },
+    { q: "A continuous load is defined as a load where the max current continues for ___ or more.", a: "3 hours", o: ["1 hour", "2 hours", "3 hours", "4 hours"], r: "Article 100" },
+    { q: "Standard multiplier for calculating a commercial show window load?", a: "200 VA per linear foot", o: ["100 VA per ft", "180 VA per ft", "200 VA per ft", "1200 VA per ft"], r: "NEC 220.14(G)" },
+    { q: "Which table is used to determine the Grounding Electrode Conductor (GEC) size?", a: "Table 250.66", o: ["Table 250.66", "Table 250.102", "Table 250.122", "Table 310.16"], r: "NEC 250.66" },
+    { q: "The demand factor for the first 3,000 VA of dwelling unit lighting load is:", a: "100%", o: ["35%", "50%", "75%", "100%"], r: "Table 120.42" },
+    { q: "Minimum size copper conductor permitted for a 600V system?", a: "14 AWG", o: ["18 AWG", "16 AWG", "14 AWG", "12 AWG"], r: "NEC 310.3(A)" },
+    { q: "What is the FLC for a 3-phase, 460V, 25HP squirrel-cage motor?", a: "34 Amps", o: ["27 Amps", "34 Amps", "40 Amps", "48 Amps"], r: "Table 430.250" },
+    { q: "Maximum disconnects allowed for a single service?", a: "6", o: ["2", "4", "6", "8"], r: "NEC 230.71" },
+    { q: "A device box with two 12 AWG wires and a duplex receptacle has a total fill of:", a: "9.00 cu in", o: ["6.75 cu in", "9.00 cu in", "11.25 cu in", "13.5 cu in"], r: "314.16(B)" },
+    { q: "Working space width in front of electrical equipment must be at least:", a: "30 inches", o: ["24 inches", "30 inches", "36 inches", "42 inches"], r: "NEC 110.26(A)(2)" },
+    { q: "Sign outlets must be calculated at a minimum of:", a: "1200 VA", o: ["600 VA", "1000 VA", "1200 VA", "1500 VA"], r: "NEC 220.14(F)" },
+    { q: "Max distance between support clips for 3/4 inch EMT?", a: "10 feet", o: ["3 feet", "5 feet", "8 feet", "10 feet"], r: "NEC 358.30" },
+    { q: "Burial depth for Rigid Metal Conduit (RMC) under a residential driveway?", a: "18 inches", o: ["6 inches", "12 inches", "18 inches", "24 inches"], r: "Table 300.5" },
+    { q: "Vertical clearance of service conductors from a window that opens?", a: "3 feet", o: ["2 feet", "3 feet", "5 feet", "10 feet"], r: "NEC 230.9(A)" },
+    { q: "Which color identifies the grounded (neutral) conductor?", a: "White or Gray", o: ["Green", "White or Gray", "Black", "Bare"], r: "NEC 200.6" },
+    { q: "The demand load for three 15kW ranges in a dwelling unit is:", a: "14 kW", o: ["12 kW", "14 kW", "16 kW", "18 kW"], r: "Table 120.55" },
+    { q: "A laundry branch circuit must be rated at:", a: "20 Amps", o: ["15 Amps", "20 Amps", "25 Amps", "30 Amps"], r: "NEC 210.11(C)(2)" },
+    { q: "Minimum clearance for overhead service over a public alley?", a: "18 feet", o: ["12 feet", "15 feet", "18 feet", "22 feet"], r: "NEC 230.24(B)(4)" },
+    { q: "Liquidtight flexible nonmetallic conduit (LFNC) must be supported within ___ of a box.", a: "12 inches", o: ["6 inches", "12 inches", "18 inches", "3 feet"], r: "NEC 356.30" },
+    { q: "In a non-dwelling unit, general-use receptacles are calculated at ___ per outlet.", a: "180 VA", o: ["90 VA", "100 VA", "180 VA", "360 VA"], r: "NEC 220.14(I)" },
+    { q: "Class II, Div 1 locations are those that are hazardous due to:", a: "Combustible Dust", o: ["Flammable Gas", "Flammable Liquid", "Combustible Dust", "Ignitible Fibers"], r: "NEC 500.5(C)" },
+    { q: "The ampacity of a #3 THHN copper conductor at 90°C is:", a: "115 Amps", o: ["85 Amps", "100 Amps", "110 Amps", "115 Amps"], r: "Table 310.16" },
+    { q: "Standard rating for an inverse time circuit breaker for a 10HP, 230V, 1-phase motor?", a: "125 Amps", o: ["80 Amps", "100 Amps", "125 Amps", "150 Amps"], r: "Table 430.52" },
+    { q: "A dwelling unit bathroom receptacle must be:", a: "GFCI Protected", o: ["AFCI Protected", "GFCI Protected", "Both AFCI/GFCI", "Not Required"], r: "NEC 210.8(A)" },
+    { q: "Number of 15A circuits needed for a 2400 sq ft house lighting load (3VA per sq ft)?", a: "4", o: ["3", "4", "5", "6"], r: "NEC 210.11(A)" },
+    { q: "A 'Feeder' consists of conductors between the service and:", a: "Final branch-circuit overcurrent device", o: ["Meter", "Transformer", "Final branch-circuit overcurrent device", "Receptacle"], r: "Article 100" },
+    { q: "Minimum size copper GEC for a service with 2/0 AWG copper ungrounded conductors?", a: "4 AWG", o: ["8 AWG", "6 AWG", "4 AWG", "2 AWG"], r: "Table 250.66" },
+    { q: "Type NM cable must be supported within ___ of every outlet box.", a: "12 inches", o: ["6 inches", "12 inches", "18 inches", "3 feet"], r: "NEC 334.30" },
+    { q: "Volume allowance for a 10 AWG conductor for box fill?", a: "2.50 cu in", o: ["2.00 cu in", "2.25 cu in", "2.50 cu in", "3.00 cu in"], r: "Table 314.16(B)" },
+    { q: "What is the FLC of a 1/2 HP, 115V single-phase motor?", a: "9.8 Amps", o: ["4.4 Amps", "5.8 Amps", "7.2 Amps", "9.8 Amps"], r: "Table 430.248" },
+    { q: "Bonding of metal water piping must be done per:", a: "NEC 250.104", o: ["NEC 250.52", "NEC 250.66", "NEC 250.104", "NEC 250.122"], r: "NEC 250.104" },
+    { q: "The rating of a cord-and-plug load to a 15A branch circuit cannot exceed:", a: "12 Amps", o: ["9 Amps", "10 Amps", "12 Amps", "15 Amps"], r: "NEC 210.23(A)(1)" }
+];
+
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+const activeQuestions = shuffle([...questionBank]);
+let currentIdx = 0;
+let timeLeft = 120 * 60;
+let selectedAnswers = new Array(37).fill(null);
+let flaggedQuestions = new Array(37).fill(false);
+
+function init() {
+    const nav = document.getElementById('nav-dots');
+    nav.innerHTML = '';
+    for(let i=0; i<37; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'q-dot';
+        dot.id = 'dot-' + i;
+        dot.innerText = i + 1;
+        dot.onclick = () => { currentIdx = i; loadQuestion(); };
+        nav.appendChild(dot);
+    }
+    loadQuestion();
+    startTimer();
+}
+
+function loadQuestion() {
+    const q = activeQuestions[currentIdx];
+    document.getElementById('q-progress').innerText = `Question ${currentIdx + 1} of 37`;
+    document.getElementById('question').innerText = q.q;
+    
+    document.querySelectorAll('.q-dot').forEach(d => d.classList.remove('active'));
+    document.getElementById('dot-' + currentIdx).classList.add('active');
+
+    const fBtn = document.getElementById('flag-btn');
+    fBtn.className = flaggedQuestions[currentIdx] ? 'flag-btn is-flagged' : 'flag-btn';
+    fBtn.innerText = flaggedQuestions[currentIdx] ? '🚩 Flagged' : 'Flag Question';
+
+    const container = document.getElementById('options-container');
+    container.innerHTML = '';
+    
+    // Use the 4 options from the question object
+    q.o.forEach(opt => {
+        const div = document.createElement('div');
+        div.className = 'option' + (selectedAnswers[currentIdx] === opt ? ' selected' : '');
+        div.innerText = opt;
+        div.onclick = () => { selectedAnswers[currentIdx] = opt; loadQuestion(); };
+        container.appendChild(div);
+    });
+}
+
+function handleNext() { if (currentIdx < 36) { currentIdx++; loadQuestion(); } else { confirmEnd(); } }
+function handleBack() { if (currentIdx > 0) { currentIdx--; loadQuestion(); } }
+function toggleFlag() { 
+    flaggedQuestions[currentIdx] = !flaggedQuestions[currentIdx];
+    document.getElementById('dot-' + currentIdx).classList.toggle('flagged');
+    loadQuestion();
+}
+function confirmEnd() { if(confirm("End test and see results?")) endTest(); }
+
+function endTest() {
+    document.getElementById('test-container').style.display = 'none';
+    document.getElementById('review-screen').style.display = 'block';
+    let score = 0;
+    const list = document.getElementById('review-list');
+    list.innerHTML = ""; // Clear list
+    activeQuestions.forEach((q, i) => {
+        const correct = selectedAnswers[i] === q.a;
+        if(correct) score++;
+        list.innerHTML += `<div class="review-item">
+            ${flaggedQuestions[i] ? '<b>[FLAGGED]</b> ' : ''}
+            <b>Q${i+1}: ${q.q}</b><br>
+            Your Answer: <span style="color:${correct?'green':'red'}">${selectedAnswers[i] || 'None'}</span><br>
+            Correct: ${q.a} <br><small style="color:#27ae60">Reference: ${q.r}</small>
+        </div>`;
+    });
+    document.getElementById('final-score').innerText = Math.round((score/37)*100) + "%";
+    document.getElementById('raw-score').innerText = score + " / 37 Correct";
+}
+
+function startTimer() {
+    setInterval(() => {
+        if(timeLeft > 0) {
+            timeLeft--;
+            let h = Math.floor(timeLeft/3600), m = Math.floor((timeLeft%3600)/60), s = timeLeft%60;
+            document.getElementById('timer').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        } else {
+            endTest();
+        }
+    }, 1000);
+}
+
+window.onload = init;
+</script>
+</body>
+</html>
